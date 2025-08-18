@@ -1,0 +1,12 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<h1>Import Excel</h1>
+<form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <input type="file" name="excel_file" required>
+    <button type="submit" class="default">Upload</button>
+</form>
+<br>
+<a href="{% url 'admin:cards_card_changelist' %}">Back to Cards</a>
+{% endblock %}

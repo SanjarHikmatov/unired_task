@@ -1,13 +1,42 @@
 import random
 import zipfile
 
+
+def luhn_generate(prefix: str, length: int = 16) -> str:
+    """
+        Generates a valid card number using the Luhn algorithm.
+        prefix: starting digits of the card (e.g., '8600')
+        length: total length of the card number (default 16)
+    """
+    number = [int(x) for x in prefix]
+
+    while len(number) < length - 1:
+        number.append(random.randint(0, 9))
+
+    total = 0
+    reverse_digits = number[::-1]
+    for i, d in enumerate(reverse_digits):
+        if i % 2 == 0:
+            d *= 2
+            if d > 9:
+                d -= 9
+        total += d
+
+    check_digit = (10 - (total % 10)) % 10
+    number.append(check_digit)
+
+    return "".join(map(str, number))
+
+
 def generate_cards_excel(filename="cards.xlsx", rows=500):
     """
-    This function creates an Excel (.xlsx) file without using any external packages.
-    The file will contain random card data such as card number, expiration date,
-    phone number, status, and balance.
-    """
+        Generates an Excel (.xlsx) file with random card data.
+        All card numbers are generated to be valid according to the Luhn algorithm.
 
+        Args:
+            filename (str): Output file name (default "cards.xlsx")
+            rows (int): Number of rows/cards to generate (default 500)
+    """
     content_types = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
     <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
         <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
@@ -39,7 +68,6 @@ def generate_cards_excel(filename="cards.xlsx", rows=500):
     """
 
     columns = ["card_number", "expire", "phone", "status", "balance"]
-
     statuses = ["active", "inactive", "expired"]
     expire_formats = ["{:02d}/20{:02d}", "20{:02d}-{:02d}", "{:02d}.20{:02d}", "{:02d}-20{:02d}"]
     phone_formats = ["99 973 {:02d} {:02d}", "973-{:02d}-{:02d}", "+99899{:02d}{:02d}{:02d}", "(empty)"]
@@ -49,15 +77,12 @@ def generate_cards_excel(filename="cards.xlsx", rows=500):
 
     for _ in range(rows):
         prefix = random.choice(card_prefixes)
-        card_number = prefix + "".join(str(random.randint(0, 9)) for _ in range(12))
+        card_number = luhn_generate(prefix, 16)
 
         year = random.randint(2024, 2028)
         month = random.randint(1, 12)
         fmt = random.choice(expire_formats)
-        if "{}" in fmt:
-            expire = fmt.format(year, month)
-        else:
-            expire = fmt.format(month, year % 100)
+        expire = fmt.format(month, year % 100) if "{}" in fmt else fmt.format(month, year % 100)
 
         fmt_phone = random.choice(phone_formats)
         if "(empty)" in fmt_phone or fmt_phone == "":
@@ -90,7 +115,7 @@ def generate_cards_excel(filename="cards.xlsx", rows=500):
         z.writestr("xl/_rels/workbook.xml.rels", workbook_rels)
         z.writestr("xl/worksheets/sheet1.xml", sheet)
 
-    print(f"✅ {rows} cards generated in: {filename}")
+    print(f"{rows} valid cards (Luhn) generated in: {filename}")
 
 
 generate_cards_excel("cards.xlsx", rows=500)

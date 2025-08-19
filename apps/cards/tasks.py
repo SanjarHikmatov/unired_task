@@ -48,3 +48,4 @@ def import_cards_from_excel_task(file_path):
         return {"imported": imported, "rejected": rejected}
     except Exception as e:
         return {"error": str(e)}
+

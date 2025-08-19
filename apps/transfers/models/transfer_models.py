@@ -5,6 +5,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django.core.validators import MinValueValidator, RegexValidator
 from apps.utils.models.base_model import BaseModel
+CACHE_KEY_CREATE_TRANSFER = 'create_transfer_{ext_id}'
 
 
 class Transfer(BaseModel):
@@ -88,23 +89,10 @@ class Transfer(BaseModel):
         verbose_name=_("OTP"),
     )
 
-    created_at = models.DateTimeField(
-        default=timezone.now,
-        verbose_name=_("Created at"),
-    )
-    confirmed_at = models.DateTimeField(
-        blank=True,
-        null=True,
-        verbose_name=_("Confirmed at"),
-    )
     cancelled_at = models.DateTimeField(
         blank=True,
         null=True,
         verbose_name=_("Cancelled at"),
-    )
-    updated_at = models.DateTimeField(
-        auto_now=True,
-        verbose_name=_("Updated at"),
     )
 
     class Meta:

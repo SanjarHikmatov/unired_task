@@ -5,6 +5,12 @@ from django.core.exceptions import ValidationError
 from apps.transfers.models import Transfer
 from apps.cards.models.card import Card
 
+
+ALLOWED_CURRENCIES = [643, 840]
+MAX_OTP_ATTEMPTS = 3
+
+
+
 class CardValidationMixin:
     """
         A mixin that provides strong validation for Card model fields.
@@ -108,16 +114,12 @@ class CardValidationMixin:
             total += n
         return total % 10 == 0
 
-ALLOWED_CURRENCIES = [643, 840]  # RUB, USD only as per API spec
-
-
-
 
 class TransferValidationMixin(CardValidationMixin):
     """
     A mixin for validating Transfer model fields.
     Includes:
-    - ext_id uniqueness
+    - ext_id uniqueness (only for creation)
     - currency check (must be in allowed list)
     - sender and receiver card existence
     - balance and status checks
@@ -128,8 +130,10 @@ class TransferValidationMixin(CardValidationMixin):
         ext_id = self.cleaned_data.get("ext_id", "").strip()
         if not ext_id:
             raise ValidationError("Ext ID is required")
-        if Transfer.objects.filter(ext_id=ext_id).exists():
-            raise ValidationError("Ext ID already exists")
+
+        if hasattr(self, 'check_ext_id_uniqueness') and self.check_ext_id_uniqueness:
+            if Transfer.objects.filter(ext_id=ext_id).exists():
+                raise ValidationError("Ext ID already exists")
         return ext_id
 
     def clean_currency(self):
@@ -202,6 +206,46 @@ class TransferValidationMixin(CardValidationMixin):
             raise ValidationError("Phone number is wrong formatted")
 
         return phone
+
+    def clean_otp(self):
+        """
+        Validates OTP code for transfer confirmation.
+        Checks if OTP matches and if attempts limit is not exceeded.
+        """
+        otp = self.cleaned_data.get("otp", "").strip()
+        transfer_id = self.cleaned_data.get("transfer_id")
+
+        if not otp:
+            raise ValidationError("OTP code is required")
+
+        if not otp.isdigit() or len(otp) != 6:
+            raise ValidationError("OTP must be 6 digits")
+
+        if transfer_id:
+            try:
+                transfer = Transfer.objects.get(id=transfer_id)
+
+                print(f"[v0] Debug - User OTP: '{otp}' (type: {type(otp)})")
+                print(f"[v0] Debug - DB OTP: '{transfer.otp}' (type: {type(transfer.otp)})")
+                print(f"[v0] Debug - OTP comparison: {transfer.otp} != {otp} = {transfer.otp != otp}")
+
+                # Check if max attempts exceeded
+                if transfer.try_count >= MAX_OTP_ATTEMPTS:
+                    raise ValidationError("Maximum OTP attempts exceeded")
+
+                # Check if OTP matches - convert both to strings for comparison
+                if str(transfer.otp) != str(otp):
+                    # Increment try count
+                    transfer.try_count += 1
+                    transfer.save(update_fields=['try_count'])
+
+                    attempts_left = MAX_OTP_ATTEMPTS - transfer.try_count
+                    raise ValidationError(f"Invalid OTP code. {attempts_left} attempts left")
+
+            except Transfer.DoesNotExist:
+                raise ValidationError("Transfer not found")
+
+        return otp
 
     def clean(self):
         """

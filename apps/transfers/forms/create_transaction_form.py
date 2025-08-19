@@ -75,6 +75,8 @@ class CreateTransferForm(TransferValidationMixin, forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        self.check_ext_id_uniqueness = True
+
         self.fields['sender_phone'].required = True
 
         self.fields['currency'].widget.choices = [
@@ -98,8 +100,13 @@ class CreateTransferForm(TransferValidationMixin, forms.ModelForm):
         return transfer
 
 
-class ConfirmTransferForm(forms.Form):
-    """Form for confirming transfers with OTP."""
+class ConfirmTransferForm(TransferValidationMixin, forms.Form):
+    """Form for confirming transfers with OTP validation."""
+
+    transfer_id = forms.IntegerField(
+        widget=forms.HiddenInput(),
+        required=False
+    )
 
     ext_id = forms.CharField(
         max_length=100,
@@ -107,7 +114,8 @@ class ConfirmTransferForm(forms.Form):
             'class': 'form-control',
             'placeholder': 'tr-uuid-here'
         }),
-        label=_('External ID')
+        label=_('External ID'),
+        required=False
     )
 
     otp = forms.CharField(
@@ -121,26 +129,48 @@ class ConfirmTransferForm(forms.Form):
         label=_('OTP Code')
     )
 
-    def clean_ext_id(self):
-        ext_id = self.cleaned_data.get('ext_id')
-        try:
-            transfer = Transfer.objects.get(ext_id=ext_id)
-            if transfer.state != Transfer.State.CREATED:
-                raise forms.ValidationError(_('Transfer is not in created state'))
-            self.transfer = transfer
-            return ext_id
-        except Transfer.DoesNotExist:
-            raise forms.ValidationError(_('Transfer not found'))
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.check_ext_id_uniqueness = False
 
-    def clean_otp(self):
-        otp = self.cleaned_data.get('otp')
-        if not otp or not otp.isdigit():
-            raise forms.ValidationError(_('OTP must be 6 digits'))
-        return otp
+    def clean(self):
+        """
+        Cross-field validation for transfer confirmation.
+        """
+        cleaned_data = super().clean()
+        transfer_id = cleaned_data.get('transfer_id')
+        ext_id = cleaned_data.get('ext_id')
+
+        transfer = None
+        if transfer_id:
+            try:
+                transfer = Transfer.objects.get(id=transfer_id)
+            except Transfer.DoesNotExist:
+                raise forms.ValidationError(_('Transfer not found'))
+        elif ext_id:
+            try:
+                transfer = Transfer.objects.get(ext_id=ext_id)
+            except Transfer.DoesNotExist:
+                raise forms.ValidationError(_('Transfer not found'))
+        else:
+            raise forms.ValidationError(_('Either transfer_id or ext_id is required'))
+
+        if transfer.state != Transfer.State.CREATED:
+            raise forms.ValidationError(_('Transfer is not in created state'))
+
+        cleaned_data['transfer_id'] = transfer.id
+        self.transfer = transfer
+
+        return cleaned_data
 
 
 class CancelTransferForm(forms.Form):
     """Form for cancelling transfers."""
+
+    transfer_id = forms.IntegerField(
+        widget=forms.HiddenInput(),
+        required=False
+    )
 
     ext_id = forms.CharField(
         max_length=100,
@@ -148,16 +178,32 @@ class CancelTransferForm(forms.Form):
             'class': 'form-control',
             'placeholder': 'tr-uuid-here'
         }),
-        label=_('External ID')
+        label=_('External ID'),
+        required=False
     )
 
-    def clean_ext_id(self):
-        ext_id = self.cleaned_data.get('ext_id')
-        try:
-            transfer = Transfer.objects.get(ext_id=ext_id)
-            if transfer.state != Transfer.State.CREATED:
-                raise forms.ValidationError(_('Only created transfers can be cancelled'))
-            self.transfer = transfer
-            return ext_id
-        except Transfer.DoesNotExist:
-            raise forms.ValidationError(_('Transfer not found'))
+    def clean(self):
+        """Find transfer by either transfer_id or ext_id."""
+        cleaned_data = super().clean()
+        transfer_id = cleaned_data.get('transfer_id')
+        ext_id = cleaned_data.get('ext_id')
+
+        transfer = None
+        if transfer_id:
+            try:
+                transfer = Transfer.objects.get(id=transfer_id)
+            except Transfer.DoesNotExist:
+                raise forms.ValidationError(_('Transfer not found'))
+        elif ext_id:
+            try:
+                transfer = Transfer.objects.get(ext_id=ext_id)
+            except Transfer.DoesNotExist:
+                raise forms.ValidationError(_('Transfer not found'))
+        else:
+            raise forms.ValidationError(_('Either transfer_id or ext_id is required'))
+
+        if transfer.state != Transfer.State.CREATED:
+            raise forms.ValidationError(_('Only created transfers can be cancelled'))
+
+        self.transfer = transfer
+        return cleaned_data

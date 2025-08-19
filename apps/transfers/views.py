@@ -50,8 +50,6 @@ def jsonrpc_handler(request):
         request_id = data.get('id')
 
         if method in ['create', 'transfer.create']:
-            otp = generate_otp()
-            telegram = send_telegram_message(otp)
             return create_transfer_jsonrpc(params, request_id)
         elif method in ['confirm', 'transfer.confirm']:
             return confirm_transfer_jsonrpc(params, request_id)
@@ -121,7 +119,6 @@ def create_transfer_jsonrpc(params, request_id):
         }
         return JsonResponse(create_jsonrpc_response(result=result, request_id=request_id))
     else:
-        # Convert form errors to JSON-RPC error format
         error_details = {}
         for field, errors in form.errors.items():
             error_details[field] = [str(error) for error in errors]
@@ -186,3 +183,31 @@ def confirm_transfer_jsonrpc(params, request_id):
         }
         return JsonResponse(create_jsonrpc_response(error=error, request_id=request_id))
 
+
+def cancel_transfer_jsonrpc(params, request_id):
+    """JSON-RPC method for cancelling transfers."""
+    form = CancelTransferForm(params)
+
+    if form.is_valid():
+        transfer = form.transfer
+        transfer.state = Transfer.State.CANCELLED
+        transfer.cancelled_at = timezone.now()
+        transfer.save()
+
+        result = {
+            "ext_id": transfer.ext_id,
+            "state": transfer.state,
+            "cancelled_at": transfer.cancelled_at.isoformat()
+        }
+        return JsonResponse(create_jsonrpc_response(result=result, request_id=request_id))
+    else:
+        error_details = {}
+        for field, errors in form.errors.items():
+            error_details[field] = [str(error) for error in errors]
+
+        error = {
+            "code": 1001,
+            "message": get_error_message(1001),
+            "data": error_details
+        }
+        return JsonResponse(create_jsonrpc_response(error=error, request_id=request_id))

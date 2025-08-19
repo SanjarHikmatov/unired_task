@@ -101,7 +101,9 @@ class CreateTransferForm(TransferValidationMixin, forms.ModelForm):
 
 
 class ConfirmTransferForm(TransferValidationMixin, forms.Form):
-    """Form for confirming transfers with OTP validation."""
+    """
+        Form for confirming transfers with OTP validation
+    """
 
     transfer_id = forms.IntegerField(
         widget=forms.HiddenInput(),
@@ -135,7 +137,7 @@ class ConfirmTransferForm(TransferValidationMixin, forms.Form):
 
     def clean(self):
         """
-        Cross-field validation for transfer confirmation.
+            Cross-field validation for transfer confirmation.
         """
         cleaned_data = super().clean()
         transfer_id = cleaned_data.get('transfer_id')

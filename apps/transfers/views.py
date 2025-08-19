@@ -1,11 +1,15 @@
 import json
-import random
+
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.utils import timezone
-from django.utils.translation import gettext as _
-from apps.transfers.forms.create_transaction_form import CreateTransferForm, ConfirmTransferForm, CancelTransferForm
+
+from apps.transfers.forms.create_transaction_form import (
+    CreateTransferForm,
+    ConfirmTransferForm,
+    CancelTransferForm,
+)
 from apps.transfers.models.transfer_models import Transfer
 from apps.utils.models.errors_model import Error
 from apps.utils.services import send_telegram_message, generate_otp
@@ -13,7 +17,17 @@ from apps.utils.decorators.logging_decorator import track_method
 
 
 def create_jsonrpc_response(result=None, error=None, request_id=None):
-    """Helper function to create JSON-RPC 2.0 response."""
+    """
+    Helper function to build a JSON-RPC 2.0 response object.
+
+    Args:
+        result (dict | None): The result data of the method if successful.
+        error (dict | None): The error object if something went wrong.
+        request_id (str | int | None): The ID of the request for matching.
+
+    Returns:
+        dict: A valid JSON-RPC response structure.
+    """
     response = {
         "jsonrpc": "2.0",
         "id": request_id
@@ -28,7 +42,16 @@ def create_jsonrpc_response(result=None, error=None, request_id=None):
 
 
 def get_error_message(error_code, lang='en'):
-    """Get localized error message by code."""
+    """
+    Retrieves a localized error message by error code.
+
+    Args:
+        error_code (int): The error code to look up.
+        lang (str): Language for the message ('en', 'ru', 'uz').
+
+    Returns:
+        str: The localized error message if found, otherwise a default.
+    """
     try:
         error_obj = Error.objects.get(code=error_code)
         if lang == 'uz':
@@ -40,11 +63,24 @@ def get_error_message(error_code, lang='en'):
     except Error.DoesNotExist:
         return f"Unknown error: {error_code}"
 
+
 @csrf_exempt
 @require_http_methods(["POST"])
 @track_method('jsonrpc_handler')
 def jsonrpc_handler(request):
-    """Main JSON-RPC handler for all transfer operations."""
+    """
+    Main JSON-RPC request handler.
+
+    Parses the request body, determines the requested method,
+    and dispatches the call to the appropriate transfer operation
+    (create, confirm, cancel).
+
+    Args:
+        request (HttpRequest): The incoming HTTP request.
+
+    Returns:
+        JsonResponse: A JSON-RPC 2.0 formatted response.
+    """
     try:
         data = json.loads(request.body)
         method = data.get('method')
@@ -82,12 +118,25 @@ def jsonrpc_handler(request):
 
 
 def create_transfer_jsonrpc(params, request_id):
-    """JSON-RPC method for creating transfers."""
+    """
+    JSON-RPC method: Create a new transfer.
+
+    - Validates the input data using CreateTransferForm.
+    - Generates an OTP for confirmation.
+    - Saves the transfer in "created" state.
+
+    Args:
+        params (dict): Parameters from JSON-RPC request.
+        request_id (str | int): Request ID for the response.
+
+    Returns:
+        JsonResponse: JSON-RPC formatted response with transfer details or errors.
+    """
     form_data = {
         'sender_card_number': params.get('sender_card_numbere', params.get('sender_card_number', '')).replace(' ', ''),
         'sender_card_expiry': params.get('sender_card_expiry', ''),
         'receiver_card_number': params.get('receiver_card_number', '').replace(' ', ''),
-        'sending_amount': params.get('sending_amount'),  # Map to sending_amount field (not amount)
+        'sending_amount': params.get('sending_amount'),
         'currency': params.get('currency'),
         'sender_phone': params.get('sender_phone'),
         'receiver_phone': params.get('receiver_phone'),
@@ -121,10 +170,7 @@ def create_transfer_jsonrpc(params, request_id):
         }
         return JsonResponse(create_jsonrpc_response(result=result, request_id=request_id))
     else:
-        error_details = {}
-        for field, errors in form.errors.items():
-            error_details[field] = [str(error) for error in errors]
-
+        error_details = {field: [str(error) for error in errors] for field, errors in form.errors.items()}
         error = {
             "code": 1001,
             "message": get_error_message(1001),
@@ -132,8 +178,23 @@ def create_transfer_jsonrpc(params, request_id):
         }
         return JsonResponse(create_jsonrpc_response(error=error, request_id=request_id))
 
+
 def confirm_transfer_jsonrpc(params, request_id):
-    """JSON-RPC method for confirming transfers."""
+    """
+    JSON-RPC method: Confirm a transfer using OTP.
+
+    - Validates the input data.
+    - Checks if the OTP matches.
+    - If valid → marks the transfer as "confirmed".
+    - If invalid → increments attempt counter; cancels after 3 failed tries.
+
+    Args:
+        params (dict): Parameters from JSON-RPC request.
+        request_id (str | int): Request ID for the response.
+
+    Returns:
+        JsonResponse: JSON-RPC response with confirmation result or error.
+    """
     form = ConfirmTransferForm(params)
 
     if form.is_valid():
@@ -174,10 +235,7 @@ def confirm_transfer_jsonrpc(params, request_id):
 
             return JsonResponse(create_jsonrpc_response(error=error, request_id=request_id))
     else:
-        error_details = {}
-        for field, errors in form.errors.items():
-            error_details[field] = [str(error) for error in errors]
-
+        error_details = {field: [str(error) for error in errors] for field, errors in form.errors.items()}
         error = {
             "code": 1001,
             "message": get_error_message(1001),
@@ -187,7 +245,20 @@ def confirm_transfer_jsonrpc(params, request_id):
 
 
 def cancel_transfer_jsonrpc(params, request_id):
-    """JSON-RPC method for cancelling transfers."""
+    """
+    JSON-RPC method: Cancel a transfer.
+
+    - Validates the input data.
+    - Sets the transfer state to "cancelled".
+    - Records cancellation timestamp.
+
+    Args:
+        params (dict): Parameters from JSON-RPC request.
+        request_id (str | int): Request ID for the response.
+
+    Returns:
+        JsonResponse: JSON-RPC response with cancellation result or errors.
+    """
     form = CancelTransferForm(params)
 
     if form.is_valid():
@@ -203,10 +274,7 @@ def cancel_transfer_jsonrpc(params, request_id):
         }
         return JsonResponse(create_jsonrpc_response(result=result, request_id=request_id))
     else:
-        error_details = {}
-        for field, errors in form.errors.items():
-            error_details[field] = [str(error) for error in errors]
-
+        error_details = {field: [str(error) for error in errors] for field, errors in form.errors.items()}
         error = {
             "code": 1001,
             "message": get_error_message(1001),

@@ -5,9 +5,15 @@ from apps.cards.models import Card
 
 class Command(BaseCommand):
     """
-        Management command: Exports cards to a CSV file.
-        Optional filters (--status, --card_number, --phone) can be used
-        to export only the required records.
+        Management command that exports card data into a CSV file.
+
+        You can optionally filter results by:
+          --status       (active, inactive, expired)
+          --card_number  (partial or full match, spaces ignored)
+          --phone        (partial or full match, spaces ignored)
+
+        Example usage:
+          python manage.py export_cards --status=active --phone=99890
     """
 
     help = "Export cards to CSV with optional filters"
@@ -34,11 +40,11 @@ class Command(BaseCommand):
             writer.writerow(["card_number", "expire", "phone", "status", "balance"])
             for card in queryset:
                 writer.writerow([
-                    card.format_card_number,   # property dan foydalanamiz
-                    card.format_expire,        # normalize qilingan expiry date
-                    card.format_phone,         # formatlangan telefon
+                    card.format_card_number,
+                    card.format_expire,
+                    card.format_phone,
                     card.status,
                     card.balance,
                 ])
 
-        self.stdout.write(self.style.SUCCESS("Cards exported to cards_export.csv"))
+        self.stdout.write(self.style.SUCCESS("Cards successfully exported to cards_export.csv"))

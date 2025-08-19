@@ -11,20 +11,30 @@ import random
 from decimal import Decimal
 
 ALLOWED_CURRENCIES = {643, 840}
+
 STATIC_RATES = {
-    643: Decimal("1.00"),
-    840: Decimal("1.00"),
+    643: Decimal("1.00"),  # RUB
+    840: Decimal("1.00"),  # USD
 }
 
-
 logger = logging.getLogger(__name__)
+
+
 def generate_otp(length: int = 6) -> str:
+    """
+        Generate a random numeric OTP code with a default length of 6 digits.
+        Example: '582934'
+    """
     return "".join(str(random.randint(0, 9)) for _ in range(length))
+
 
 def send_telegram_message(message: str) -> bool:
     """
-    Haqiqiy Telegram bot orqali xabar yuboradi.
-    Chat ID va token avvaldan berilgan.
+        Send a message to a Telegram chat using the Bot API.
+
+        Requires:
+        - TELEGRAM_BOT_TOKEN (from .env)
+        - chat_id (from .env)
     """
     token = TELEGRAM_BOT_TOKEN
     chat_id = user_chat_id
@@ -36,7 +46,6 @@ def send_telegram_message(message: str) -> bool:
     }
 
     try:
-
         response = requests.post(url, data=payload, timeout=10)
         response.raise_for_status()
         logger.info(f"[TELEGRAM] Message sent: {message}")
@@ -45,20 +54,38 @@ def send_telegram_message(message: str) -> bool:
         logger.error(f"[TELEGRAM] Failed to send message: {e}")
         return False
 
+
 def calculate_exchange(amount: Decimal, currency: int) -> Decimal:
+    """
+        Convert an amount to the target currency using static exchange rates.
+
+        :param amount: Decimal amount to convert
+        :param currency: Currency code (e.g., 643=RUB, 840=USD)
+        :return: Converted amount rounded to 2 decimals
+    """
     rate = STATIC_RATES.get(currency)
     if rate is None:
         raise ValueError("Currency not supported")
     return (amount * rate).quantize(Decimal("0.01"))
 
 
+def mask_card_number(card_number: str) -> str:
+    """
+    Format a card number by grouping digits in blocks of 4.
+    Example: 8600123456789012 -> '8600 1234 5678 9012'
+    """
+    return " ".join([card_number[i:i + 4] for i in range(0, len(card_number), 4)])
 
-def mask_card_number(card_number):
-    """Format card number: 8600123456789012 -> 8600 1234 5678 9012"""
-    return " ".join([card_number[i:i+4] for i in range(0, len(card_number), 4)])
 
-def mask_phone(phone):
-    """Format phone: 998991234567 -> +998 99 123 45 67"""
+def mask_phone(phone: str) -> str:
+    """
+        Format a phone number into a standard readable form.
+
+        Examples:
+        - 998991234567 -> '+998 99 123 45 67'
+        - 991234567 -> '+998 99 123 45 67'
+        - Empty/invalid -> '-'
+    """
     if not phone or phone in ("(empty)", ""):
         return "-"
     digits = "".join(filter(str.isdigit, phone))
@@ -70,16 +97,20 @@ def mask_phone(phone):
         return f"+998 {digits[0:2]} {digits[2:5]} {digits[5:7]} {digits[7:9]}"
     return phone
 
-def mask_expire(expire):
+
+def mask_expire(expire: str) -> str:
     """
-    Normalize and show expiry date as MM/YY (e.g. 12/24),
-    even if stored in formats like:
-    - 12/2024
-    - 2024-12
-    - 12.2024
-    - 12-2024
-    - 2024  (year only)
-    - 12    (month only)
+        Normalize and display a card expiry date in MM/YY format.
+
+        Supported input formats:
+        - 12/2024 -> '12/24'
+        - 2024-12 -> '12/24'
+        - 12.2024 -> '12/24'
+        - 12-2024 -> '12/24'
+        - 2024    -> '01/24' (assumes January if only year is provided)
+        - 12      -> '12/--' (month only, year unknown)
+
+        If empty, returns '-'.
     """
     if not expire:
         return "-"
@@ -96,7 +127,7 @@ def mask_expire(expire):
         year = digits[2:]
         return f"{month}/{year[-2:]}"
 
-    if len(digits) == 4:
+    if len(digits) == 4 and not digits.startswith("20"):
         month = digits[:2]
         year = digits[2:]
         return f"{month}/{year}"
@@ -110,4 +141,3 @@ def mask_expire(expire):
         return f"{month}/--"
 
     return expire
-

@@ -17,7 +17,6 @@ class Command(BaseCommand):
     """
 
     help = "Send fake messages to filtered cards (simulate Telegram bot messages)."
-    help = "Send fake messages to filtered cards (simulate Telegram bot messages)."
 
     def add_arguments(self, parser):
         parser.add_argument(

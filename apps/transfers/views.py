@@ -9,6 +9,8 @@ from apps.transfers.forms.create_transaction_form import CreateTransferForm, Con
 from apps.transfers.models.transfer_models import Transfer
 from apps.utils.models.errors_model import Error
 from apps.utils.services import send_telegram_message, generate_otp
+from apps.utils.decorators.logging_decorator import track_method
+
 
 def create_jsonrpc_response(result=None, error=None, request_id=None):
     """Helper function to create JSON-RPC 2.0 response."""
@@ -38,9 +40,9 @@ def get_error_message(error_code, lang='en'):
     except Error.DoesNotExist:
         return f"Unknown error: {error_code}"
 
-
 @csrf_exempt
 @require_http_methods(["POST"])
+@track_method('jsonrpc_handler')
 def jsonrpc_handler(request):
     """Main JSON-RPC handler for all transfer operations."""
     try:

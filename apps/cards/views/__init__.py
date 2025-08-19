@@ -1,0 +1,1 @@
+from .card_info_view import *

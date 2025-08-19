@@ -10,6 +10,18 @@ from apps.utils.decorators.logging_decorator import track_method
 class CardInfoView(APIView):
     @track_method('post')
     def post(self, request):
+        """
+            Handle POST request to retrieve card information.
+
+            Steps:
+            1. Validate input using CardInfoRequestSerializer.
+            2. Check cache for existing card info.
+            3. If cached, return cached data.
+            4. Query the database for the card by card_number and expire date.
+            5. If found, mask the card number and return status, balance, phone, and masked_card.
+            6. Cache the response for 30 seconds to reduce DB load.
+            7. If not found, return a 404 error and cache the error response.
+        """
         serializer = CardInfoRequestSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

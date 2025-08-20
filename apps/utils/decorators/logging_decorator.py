@@ -153,6 +153,7 @@ def serialize_response(response):
 
     Returns:
         str: Serialized response (safe for logs)
+        
     """
     try:
         if hasattr(response, 'content'):

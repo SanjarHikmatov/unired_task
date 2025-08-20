@@ -1,9 +1,9 @@
 import uuid
 
 from django.db import models
-from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django.core.validators import MinValueValidator, RegexValidator
+
 from apps.utils.models.base_model import BaseModel
 CACHE_KEY_CREATE_TRANSFER = 'create_transfer_{ext_id}'
 

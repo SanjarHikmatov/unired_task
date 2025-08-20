@@ -1,68 +1,13 @@
 {
   "info": {
-    "_postman_id": "cf70329b-0225-4e35-a979-ac6b45aadcc9",
+    "_postman_id": "0349dc84-ce59-4628-afee-60d8bf025047",
     "name": "task_collection",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "_exporter_id": "44608219"
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
     {
       "name": "transfer",
       "item": [
-        {
-          "name": "confirm",
-          "item": [
-            {
-              "name": "confirm",
-              "request": {
-                "method": "POST",
-                "header": [],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"transfer.confirm\",\n  \"params\": {\n    \"ext_id\": \"tr-11\",\n    \"otp\": 984033\n  },\n  \"id\": 1\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                },
-                "url": {
-                  "raw": "http://127.0.0.1:8000/transfer/jsonrpc/",
-                  "host": ["http://127.0.0.1:8000/transfer"],
-                  "path": ["jsonrpc", ""]
-                }
-              },
-              "response": []
-            }
-          ]
-        },
-        {
-          "name": "cancel",
-          "item": [
-            {
-              "name": "cancel",
-              "request": {
-                "method": "POST",
-                "header": [],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"transfer.cancel\",\n  \"params\": {\n    \"transfer_id\": \"1\",\n    \"ext_id\": \"cd322a90-f9d6-4c07-a76a-8c7b5892a41e\"\n  },\n  \"id\": 1\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                },
-                "url": {
-                  "raw": "http://127.0.0.1:8000/transfer/jsonrpc/",
-                  "host": ["http://127.0.0.1:8000/transfer"],
-                  "path": ["jsonrpc", ""]
-                }
-              },
-              "response": []
-            }
-          ]
-        },
         {
           "name": "create",
           "item": [
@@ -79,20 +24,104 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"transfer.create\",\n  \"params\": {\n    \"sender_card_number\": \"8600 1138 2652 1138\",\n    \"sender_card_expiry\": \"10/25\",\n    \"receiver_card_number\": \"8600 2675 6175 0060\",\n    \"sending_amount\": 20.00,\n    \"currency\": 643,\n    \"receiver_phone\": \"+998971001010\",\n    \"receiving_amount\": 2000.00,\n    \"sender_phone\": \"+998999999999\"\n  },\n  \"id\": 1\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
+                  "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"transfer.create\",\n  \"params\": {\n    \"sender_card_number\": \"8600 1138 2652 1138\",\n    \"sender_card_expiry\": \"10/25\",\n    \"receiver_card_number\": \"8600 2675 6175 0060\",\n    \"sending_amount\": 20.00,\n    \"currency\": 643,\n    \"receiver_phone\": \"+998971001010\",\n    \"receiving_amount\": 2000.00,\n    \"sender_phone\": \"+998999999999\"\n  },\n  \"id\": 1\n}"
                 },
                 "url": {
-                  "raw": "http://127.0.0.1:8000/transfer/create-transfer/",
-                  "host": ["http://127.0.0.1:8000/transfer"],
+                  "raw": "{{base_url}}/transfer/create-transfer/",
+                  "host": ["{{base_url}}", "transfer"],
                   "path": ["create-transfer", ""]
                 }
               },
-              "response": []
+              "response": [],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test(\"Status code is 200\", function () {",
+                      "    pm.response.to.have.status(200);",
+                      "});",
+                      "",
+                      "let json = pm.response.json();",
+                      "if(json.result){",
+                      "   pm.environment.set(\"transaction_id\", json.result.transaction_id);",
+                      "   pm.environment.set(\"otp_required\", json.result.otp_required);",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "confirm",
+          "item": [
+            {
+              "name": "confirm",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"transfer.confirm\",\n  \"params\": {\n    \"ext_id\": \"{{transaction_id}}\",\n    \"otp\": 984033\n  },\n  \"id\": 1\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/transfer/jsonrpc/",
+                  "host": ["{{base_url}}", "transfer"],
+                  "path": ["jsonrpc", ""]
+                }
+              },
+              "response": [],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test(\"Status code is 200\", function () {",
+                      "    pm.response.to.have.status(200);",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "cancel",
+          "item": [
+            {
+              "name": "cancel",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"transfer.cancel\",\n  \"params\": {\n    \"transfer_id\": \"1\",\n    \"ext_id\": \"{{transaction_id}}\"\n  },\n  \"id\": 1\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/transfer/jsonrpc/",
+                  "host": ["{{base_url}}", "transfer"],
+                  "path": ["jsonrpc", ""]
+                }
+              },
+              "response": [],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test(\"Status code is 200\", function () {",
+                      "    pm.response.to.have.status(200);",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ]
             }
           ]
         }
@@ -111,24 +140,42 @@
                 "header": [],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"card_number\": \"8600123456780435\",\n  \"expire\": \"12/17\"\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
+                  "raw": "{\n  \"card_number\": \"8600123456780435\",\n  \"expire\": \"12/17\"\n}"
                 },
                 "url": {
-                  "raw": "http://127.0.0.1:8000/card/card-info/",
-                  "host": ["http://127.0.0.1:8000/card"],
+                  "raw": "{{base_url}}/card/card-info/",
+                  "host": ["{{base_url}}", "card"],
                   "path": ["card-info", ""]
                 }
               },
-              "response": []
+              "response": [],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test(\"Status code is 200\", function () {",
+                      "    pm.response.to.have.status(200);",
+                      "});",
+                      "",
+                      "let json = pm.response.json();",
+                      "pm.expect(json).to.have.property(\"card_status\");",
+                      "pm.expect(json).to.have.property(\"balance\");"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ]
             }
           ]
         }
       ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000"
     }
   ]
 }

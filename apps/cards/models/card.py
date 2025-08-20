@@ -1,8 +1,9 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from apps.utils.models.base_model import BaseModel
 
 
-class Card(models.Model):
+class Card(BaseModel):
     """
         Represents a bank/payment card entity with attributes like
         card number, expiry date, phone number, status, and balance.

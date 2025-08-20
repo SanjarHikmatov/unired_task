@@ -9,13 +9,24 @@ logger = logging.getLogger('method_tracker')
 
 def track_method(method_name=None, logger_name='method_tracker'):
     """
-        Decorator to track request/response data for key methods.
-        Logs:
-            - IP address
-            - Request body
-            - Processing time
-            - Response or error
-        Automatically detects JSON-RPC error in response.
+    Decorator that tracks and logs request/response data for important methods.
+
+    Logs include:
+        - Client IP address
+        - Request body
+        - Processing time in milliseconds
+        - Response data or error details
+
+    Features:
+        - Detects JSON-RPC error responses automatically
+        - Differentiates between success, error, and exception logs
+
+    Args:
+        method_name (str, optional): Custom method name for logging. Defaults to function name.
+        logger_name (str, optional): Logger name to use. Default: 'method_tracker'
+
+    Returns:
+        function: Wrapped function with logging enabled
     """
 
     def decorator(func):
@@ -87,7 +98,17 @@ def track_method(method_name=None, logger_name='method_tracker'):
 
 def get_client_ip(request):
     """
-        Extract client IP from request headers
+    Extract client IP address from request headers.
+
+    Looks for:
+        - X-Forwarded-For (proxy/load balancer)
+        - REMOTE_ADDR (direct connection)
+
+    Args:
+        request (HttpRequest): The incoming request
+
+    Returns:
+        str: Client IP address
     """
     x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
     if x_forwarded_for:
@@ -97,7 +118,16 @@ def get_client_ip(request):
 
 def get_request_body(request):
     """
-        Safely extract request body data
+    Safely extract request body data.
+
+    - For form-encoded requests (POST), sensitive fields (password, otp, token) are removed.
+    - For raw JSON/body requests, only first 500 characters are returned to avoid log bloat.
+
+    Args:
+        request (HttpRequest): The incoming request
+
+    Returns:
+        str: Extracted request body (sanitized if needed)
     """
     try:
         if hasattr(request, 'POST') and request.POST:
@@ -113,7 +143,17 @@ def get_request_body(request):
 
 def serialize_response(response):
     """
-        Safely serialize response data
+    Safely serialize response data for logging.
+
+    - Handles JsonResponse, objects, and plain strings.
+    - Truncates to 500 characters to prevent huge logs.
+
+    Args:
+        response: Any response object or data
+
+    Returns:
+        str: Serialized response (safe for logs)
+        
     """
     try:
         if hasattr(response, 'content'):

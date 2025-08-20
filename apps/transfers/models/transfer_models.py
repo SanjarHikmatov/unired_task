@@ -1,14 +1,24 @@
 import uuid
 
 from django.db import models
-from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django.core.validators import MinValueValidator, RegexValidator
+
 from apps.utils.models.base_model import BaseModel
 CACHE_KEY_CREATE_TRANSFER = 'create_transfer_{ext_id}'
 
 
 class Transfer(BaseModel):
+    """
+        Transfer Model
+
+        Represents a money transfer transaction between two cards.
+        Stores information about sender, receiver, amounts, currency,
+        and transfer state (created, confirmed, cancelled).
+
+        Inherits:
+            BaseModel: Custom base model providing fields like `created_at`, `updated_at`.
+    """
     class State(models.TextChoices):
         CREATED = "created", _("created")
         CONFIRMED = "confirmed", _("confirmed")

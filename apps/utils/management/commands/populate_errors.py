@@ -20,6 +20,14 @@ ERRORS = [
 ]
 
 class Command(BaseCommand):
+    """
+        Django management command to populate the Error table
+        with predefined error codes and multilingual messages.
+
+        Features:
+            - Idempotent: avoids creating duplicate records.
+            - Supports three languages: English, Russian, Uzbek.
+    """
     help = "Populate Error table with predefined codes/messages. Idempotent (no duplicates)."
 
     def handle(self, *args, **options):

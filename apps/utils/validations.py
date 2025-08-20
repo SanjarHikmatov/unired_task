@@ -1,4 +1,3 @@
-
 import re
 from decimal import Decimal
 from django.core.exceptions import ValidationError
@@ -6,70 +5,69 @@ from apps.transfers.models import Transfer
 from apps.cards.models.card import Card
 
 
-ALLOWED_CURRENCIES = [643, 840]
+ALLOWED_CURRENCIES = [643, 840]  # 643 = RUB, 840 = USD
 MAX_OTP_ATTEMPTS = 3
-
 
 
 class CardValidationMixin:
     """
-        A mixin that provides strong validation for Card model fields.
-        Includes validation for:
-        - card number (16 digits and Luhn compliant)
-        - expiry date (multiple formats supported)
-        - phone number (various valid formats)
-        - status (active, inactive, expired)
+    A reusable mixin that provides strict validation for Card model fields.
+    Includes validation for:
+    - Card number (16 digits and Luhn algorithm check)
+    - Expiry date (supports multiple formats)
+    - Phone number (different acceptable formats)
+    - Status (must be active, inactive, or expired)
     """
 
     def clean_card_number(self):
         """
-            Validates the card number:
-            1. Must be exactly 16 digits (ignoring spaces or non-digit characters)
-            2. Must pass the Luhn algorithm check
+        Validates the card number:
+        1. Must be exactly 16 digits (ignores spaces and non-digit characters)
+        2. Must pass the Luhn algorithm check
         """
         card_number = self.cleaned_data.get("card_number", "")
         digits = "".join(ch for ch in card_number if ch.isdigit())
 
         if not re.fullmatch(r"\d{16}", digits):
-            raise ValidationError("The card number must be 16 digits long")
+            raise ValidationError("The card number must contain exactly 16 digits")
 
         if not CardValidationMixin._luhn_check(digits):
-            raise ValidationError("The card number is invalid (does not comply with the Luhn algorithm)")
+            raise ValidationError("Invalid card number (failed Luhn check)")
 
         return digits
 
     def clean_expire(self):
         """
-            Validates the expiry date of the card.
-            Supports multiple formats such as:
-            - MM/YY
-            - YYYY-MM
-            - MM.YYYY
+        Validates the expiry date.
+        Supported formats:
+        - MM/YY
+        - YYYY-MM
+        - MM.YYYY
         """
         expire = str(self.cleaned_data.get("expire", "")).strip()
 
         if not expire:
-            raise ValidationError("This field is required")
+            raise ValidationError("Expiry date is required")
 
         patterns = [
-            r"^(0[1-9]|1[0-2])/\d{2}$",
-            r"^\d{4}-(0[1-9]|1[0-2])$",
-            r"^(0[1-9]|1[0-2])\.\d{4}$",
+            r"^(0[1-9]|1[0-2])/\d{2}$",   # MM/YY
+            r"^\d{4}-(0[1-9]|1[0-2])$",   # YYYY-MM
+            r"^(0[1-9]|1[0-2])\.\d{4}$",  # MM.YYYY
         ]
         if not any(re.fullmatch(p, expire) for p in patterns):
-            raise ValidationError("Expire date is wrong  formatted")
+            raise ValidationError("Invalid expiry date format")
 
         return expire
 
     def clean_phone(self):
         """
-            Validates the phone number.
-            Supports multiple formats including:
-            - +998XXXXXXXXX
-            - 99 973 03 03
-            - 973-03-03
-            - 991234567
-            If empty, returns an empty string.
+        Validates the phone number.
+        Supported formats:
+        - +998XXXXXXXXX
+        - 99 973 03 03
+        - 973-03-03
+        - 991234567
+        If empty, returns an empty string.
         """
         phone = str(self.cleaned_data.get("phone", "")).strip()
 
@@ -83,25 +81,26 @@ class CardValidationMixin:
             r"^\d{9}$",
         ]
         if not any(re.fullmatch(p, phone) for p in patterns):
-            raise ValidationError("Phone number is wrong formatted")
+            raise ValidationError("Invalid phone number format")
 
         return phone
 
     def clean_status(self):
         """
-           Validates the card status.
-           Only 'active', 'inactive', or 'expired' are allowed values.
+        Validates the card status.
+        Allowed values: active, inactive, expired
         """
         status = self.cleaned_data.get("status", "").lower()
         valid_statuses = {"active", "inactive", "expired"}
         if status not in valid_statuses:
-            raise ValidationError("Status be only active/inactive/expired ")
+            raise ValidationError("Status must be one of: active, inactive, expired")
         return status
+
     @staticmethod
     def _luhn_check(number: str) -> bool:
         """
-            Checks the card number using the Luhn algorithm.
-            Returns True if valid, False otherwise.
+        Performs a Luhn algorithm check on the card number.
+        Returns True if valid, False otherwise.
         """
         total = 0
         reverse_digits = number[::-1]
@@ -119,56 +118,69 @@ class TransferValidationMixin(CardValidationMixin):
     """
     A mixin for validating Transfer model fields.
     Includes:
-    - ext_id uniqueness (only for creation)
-    - currency check (must be in allowed list)
-    - sender and receiver card existence
-    - balance and status checks
-    - OTP try limit
+    - ext_id uniqueness (only on creation)
+    - Currency validation (must be allowed)
+    - Sender and receiver card validation
+    - Balance and status checks
+    - OTP validation with retry limit
     """
 
     def clean_ext_id(self):
+        """
+        Validates external transfer ID.
+        Must not be empty and must be unique (if uniqueness check is enabled).
+        """
         ext_id = self.cleaned_data.get("ext_id", "").strip()
         if not ext_id:
-            raise ValidationError("Ext ID is required")
+            raise ValidationError("External ID is required")
 
         if hasattr(self, 'check_ext_id_uniqueness') and self.check_ext_id_uniqueness:
             if Transfer.objects.filter(ext_id=ext_id).exists():
-                raise ValidationError("Ext ID already exists")
+                raise ValidationError("External ID already exists")
         return ext_id
 
     def clean_currency(self):
+        """
+        Validates the currency.
+        Only RUB (643) and USD (840) are allowed.
+        """
         currency = self.cleaned_data.get("currency")
         if currency not in ALLOWED_CURRENCIES:
-            raise ValidationError("Currency must be one of 643 (RUB), 840 (USD)")
+            raise ValidationError("Currency must be one of: 643 (RUB), 840 (USD)")
         return currency
 
     def clean_sending_amount(self):
+        """
+        Validates sending amount.
+        Must be a positive number.
+        """
         amount = self.cleaned_data.get("sending_amount")
         if not amount or Decimal(str(amount)) <= 0:
-            raise ValidationError("Sending amount must be positive")
+            raise ValidationError("Sending amount must be greater than zero")
         return Decimal(str(amount))
 
     def clean_sender_card_number(self):
+        """
+        Validates sender's card number using the Luhn check.
+        """
         number = self.cleaned_data.get("sender_card_number", "")
         if not self._luhn_check(number):
-            raise ValidationError("Invalid sender card number (Luhn check failed)")
+            raise ValidationError("Invalid sender card number (failed Luhn check)")
         return number
 
     def clean_receiver_card_number(self):
+        """
+        Validates receiver's card number using the Luhn check.
+        """
         number = self.cleaned_data.get("receiver_card_number", "")
         if not self._luhn_check(number):
-            raise ValidationError("Invalid receiver card number (Luhn check failed)")
+            raise ValidationError("Invalid receiver card number (failed Luhn check)")
         return number
 
     def clean_sender_phone(self):
         """
-        Validates the sender phone number.
-        Supports multiple formats including:
-        - +998XXXXXXXXX
-        - 99 973 03 03
-        - 973-03-03
-        - 991234567
-        If empty, returns an empty string.
+        Validates sender phone number.
+        Same rules as CardValidationMixin.clean_phone().
         """
         phone = str(self.cleaned_data.get("sender_phone", "")).strip()
 
@@ -182,14 +194,14 @@ class TransferValidationMixin(CardValidationMixin):
             r"^\d{9}$",
         ]
         if not any(re.fullmatch(p, phone) for p in patterns):
-            raise ValidationError("Phone number is wrong formatted")
+            raise ValidationError("Invalid phone number format")
 
         return phone
 
     def clean_receiver_phone(self):
         """
-        Validates the receiver phone number.
-        Same validation as sender phone.
+        Validates receiver phone number.
+        Same rules as sender phone.
         """
         phone = str(self.cleaned_data.get("receiver_phone", "")).strip()
 
@@ -203,14 +215,16 @@ class TransferValidationMixin(CardValidationMixin):
             r"^\d{9}$",
         ]
         if not any(re.fullmatch(p, phone) for p in patterns):
-            raise ValidationError("Phone number is wrong formatted")
+            raise ValidationError("Invalid phone number format")
 
         return phone
 
     def clean_otp(self):
         """
         Validates OTP code for transfer confirmation.
-        Checks if OTP matches and if attempts limit is not exceeded.
+        - Must be 6 digits
+        - Checks against stored OTP in Transfer
+        - Enforces maximum retry attempts
         """
         otp = self.cleaned_data.get("otp", "").strip()
         transfer_id = self.cleaned_data.get("transfer_id")
@@ -219,28 +233,21 @@ class TransferValidationMixin(CardValidationMixin):
             raise ValidationError("OTP code is required")
 
         if not otp.isdigit() or len(otp) != 6:
-            raise ValidationError("OTP must be 6 digits")
+            raise ValidationError("OTP must be a 6-digit number")
 
         if transfer_id:
             try:
                 transfer = Transfer.objects.get(id=transfer_id)
 
-                print(f"[v0] Debug - User OTP: '{otp}' (type: {type(otp)})")
-                print(f"[v0] Debug - DB OTP: '{transfer.otp}' (type: {type(transfer.otp)})")
-                print(f"[v0] Debug - OTP comparison: {transfer.otp} != {otp} = {transfer.otp != otp}")
-
-                # Check if max attempts exceeded
                 if transfer.try_count >= MAX_OTP_ATTEMPTS:
                     raise ValidationError("Maximum OTP attempts exceeded")
 
-                # Check if OTP matches - convert both to strings for comparison
                 if str(transfer.otp) != str(otp):
-                    # Increment try count
                     transfer.try_count += 1
                     transfer.save(update_fields=['try_count'])
 
                     attempts_left = MAX_OTP_ATTEMPTS - transfer.try_count
-                    raise ValidationError(f"Invalid OTP code. {attempts_left} attempts left")
+                    raise ValidationError(f"Incorrect OTP. {attempts_left} attempts left")
 
             except Transfer.DoesNotExist:
                 raise ValidationError("Transfer not found")
@@ -250,10 +257,10 @@ class TransferValidationMixin(CardValidationMixin):
     def clean(self):
         """
         Cross-field validations:
-        - Sender card exists and active
-        - Receiver card exists
-        - Sender has enough balance
-        - Sender has phone number
+        - Sender card must exist and match expiry date
+        - Receiver card must exist
+        - Sender card must be active
+        - Sender must have enough balance
         """
         cleaned = super().clean()
         sender_card_number = cleaned.get("sender_card_number")
@@ -267,7 +274,7 @@ class TransferValidationMixin(CardValidationMixin):
         try:
             sender = Card.objects.get(card_number=sender_card_number, expire=sender_card_expiry)
         except Card.DoesNotExist:
-            raise ValidationError("Sender card not found or expiry mismatch")
+            raise ValidationError("Sender card not found or expiry date mismatch")
 
         try:
             receiver = Card.objects.get(card_number=receiver_card_number)
@@ -278,7 +285,7 @@ class TransferValidationMixin(CardValidationMixin):
             raise ValidationError("Sender card is not active")
 
         if sender.balance is None or sender.balance < Decimal(str(sending_amount)):
-            raise ValidationError("Sender balance is not enough")
+            raise ValidationError("Insufficient sender balance")
 
         self.sender = sender
         self.receiver = receiver
